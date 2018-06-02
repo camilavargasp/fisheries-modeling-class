@@ -1,0 +1,299 @@
+---
+title: "Intro to R Exercises"
+author: "Camila Vargas"
+date: "31/5/2018"
+output: html_document
+---
+
+Intro to R. Nots and Exercises from Trevor Branch class on Fisheries Modeling and Assesment.
+
+Juan Carlos class: https://github.com/jcvdav/R4LAFF/blob/master/index.Rmd
+
+#Lists
+Function ´list()´
+
+"Lists are very useful when you want to return a lot of different things from a complicated function. In this class, a complicated function might need to return the numbers of a population in each year and the harvest rate in each year. Add them to a list and then return the list."
+
+```{r}
+x <- list()
+
+x[[1]] <- 2:10
+
+print(x)
+
+x[[2]] <- "Hello Wolrd"
+
+x[[1]][[7]] #returns value 8
+
+```
+
+
+
+#Loop
+The standard way we will use `for()` loops is to loop through a sequence of values and do some kind of action. By programming convention the looping variables are i, j, k for standard loops, dating back to the idiosyncrasies of the programming language Fortran.
+
+```{r}
+for (i in 1:10) {
+    print(i^3)
+}
+
+```
+
+
+You can have any sequence in a `for()` loop, by using the `c()` command that takes values and concatenates them into a vector: `c(3,9,5,7)`, or by using the `seq()` command to create sequences: `seq(from=1,to=11,by=2)`. To take this idea to the extreme, here is a crazy example:
+
+```{r}
+for (crazyval in c(100,"help", "August")) {
+   print(crazyval)
+}
+```
+
+#Functions
+
+Functions allow you to contain your code in smaller modules, and to reuse your code. They have a name, input parameters, a sequence of code that does something and a command that tells the function what to return (the answer).
+
+Note that SSvalue is treated as if it were a variable (it is being assigned a function with the <- operator). This means that the SSvalue function can be passed to other functions as if it were a variable! 
+
+```{r}
+SSvalue <- function(x,y) {
+   SS <- (x-y)^2
+   return(SS)
+}
+SSvalue(x=10,y=3) #49
+```
+
+The function length() tells us how many values are contained in a vector. Once we know how many values there are, we can loop over every value, send those values from xvec and yvec to the function SSvalue(), which returns the sum of squares, and then adds the result to the variable SS. Always set your variable storing the sum to zero before entering the for() loop.
+
+```{r}
+SSvecs <- function(xvec,yvec) {
+   n <- length(xvec)  #assume two vectors are same length
+   SS <- 0
+   for (i in 1:n) {
+      SS <- SS + SSvalue(xvec[i],yvec[i])
+   }
+return(SS) }
+SSvecs(x=c(3,4,5),y=c(2,4,6)) #WHY IT JUST RETURN ONE NUMBER??
+```
+
+#Scope
+The concept of “scope” refers to where you can use (or “see”) the values stored in a variable. Everything that you run in the console becomes available everywhere, including within a function.
+
+The opposite of global variables are “local variables”, which can only be accessed from within a function. The following code illustrates the difference, where xx is a global variable and yy is a local variable:
+
+```{r}
+xx <- 4
+dumb <- function() {
+   yy <- xx+4
+   print(yy)
+   xx <- 3
+   print(xx)
+}
+
+
+smarter <- function(x) {  #function has one parameter x
+   yy <- x+4
+   print(yy)   #does not return the value, just prints it to the console.
+return(yy) }
+xx <- 4        #global variable
+yy <- smarter(x=xx)  #passes global variable to function
+
+```
+
+
+
+#EXERCISES
+
+The exercises for this lab include creating functions that will act as basic building blocks for a fisheries stock assessment model.
+
+##Exercise 1
+
+The length-weight relationship converts length L in cm to weight W in kg, and has two parameters a (usually very small) and b (usually about 3). Write a function LengthWeight that takes three input parameters: length L, a, and b and returns weight using this equation:
+W = aL^b
+
+```{r}
+LengthWeight <- function(a, L, b){
+  W <- a*L^b
+  print(W)
+  return(W)
+}
+
+LengthWeight(L=30, a=0.0002, b=3.05) # 6.4kg
+
+
+
+
+```
+
+
+##Exercise 2
+In the von Bertalanffy growth equation (von Bertalanffy 1938), k is a parameter that governs how rapidly a fish increases in length as it ages, Linfinity is the asymptotic maximum length of the fish, and t0 is the (often
+10
+negative) age at which a fish is zero length. Write a function VonBert that takes four parameters: age (yr), k, Linfinity (cm), and t0 (yr), and returns length (cm)
+
+
+```{r}
+VonBert <- function(age, k , Linfinity, t0){
+  L <- Linfinity*(1- exp(-k*(age-t0)))
+  return(L)
+}
+
+VonBert(age = 5, k= 0.2, Linfinity = 80, t0=-0.2) #51.72363
+
+```
+
+
+Other ways of doing this.. 
+
+Approach 1:
+OJO: In order to call a function you have to define the variables!!! 
+One option is to do it by default and the other is redifinding them when you call the function
+
+```{r}
+lenght <- VonBert(age = 5)
+LengthWeight(L = length)
+```
+
+
+
+
+##Exercise 3: Looping over age, printing age square
+
+Write a function AgeSquare() that takes a vector ages as an input, and prints out the square of the ages. Inside the function, you will use the length() function to calculate how many elements there are in the ages vector, store this in a variable nages. Then loop through the values in the ages vector using a for loop, and use print() to output the square of each length. The point of this exercise is to practice writing loops. 
+
+```{r}
+AgeSquare <- function(age){
+  nage <- length(age)
+  for(i in 1:nage){
+    AS <- age^2
+  }
+  return(AS)
+}
+
+AgeSquare(age = 1:10) #1   4   9  16  25  36  49  64  81 100
+
+AgeSquare(age = 5:7) #25 36 49
+
+```
+
+Better practice
+
+```{r}
+AgeSquare <- function(age){
+  nage <- length(age)
+  for(i in 1:nage){
+  }
+  print(age[i]^2)
+}
+
+AgeSquare(age = 1:10)
+
+
+```
+
+
+
+
+##Exercise 4: Looping over age, printing lenght
+
+Now copy your AgeSquare() function, and rename it AgeLengths(). It will now take as parameters a vector ages, and parameters k, Linfinity, and t0 for the von Bertalanffy growth equation. Inside the for loop, instead of calculating and printing the square of the ages, call the VonBert() function you created in Exercise 2 to calculate and print the length at each age in the vector. (This exercise is to practice calling one function inside another function.) 
+
+
+```{r}
+AgeLength <- function(age, k, Linfinity, t0){
+  nage <- length(age)
+  AL <- vector(length = nage)
+  for(i in 1:nage){
+   AL<- VonBert(age = 1:10, k = 0.2, Linfinity = 80, t0 = -0.2) 
+  }
+  return(AL)
+  print(AL)
+}
+
+AgeLength(age = 1:10)
+
+#Error in VonBert() : argument "Linfinity" is missing, with no default; solution: I defined the variable in the argument of the function above. OR, define each variable when I call the function as in line 189.
+
+```
+
+Better practice, uses less RAM memory. Just prints what you need to print
+
+```{r}
+AgeLength <- function(age, k = 0.2, Linfinity = 80, t0 = -0.2) {
+  nage <- length(age)
+  for(i in 1:nage){
+  print(VonBert(age[i], k=k, Linfinity = Linfinity, t0=t0))
+  }
+}
+
+AgeLength(age = 1:10)
+
+```
+
+
+##Exercise 5: looping over age, storing and returning a vector of lengths
+
+Copy your AgeLengths() function, and rename it AgeLengthsVec(). Instead of using print() to report the calculated lengths, it will now return a vector lengths. Inside the function you will need to create an empty vector lengths using the vector() function. In the for loop, store the calculated length in element i of the lengths vector, lengths[i]. At the end of the function, return the calculated vector using the return() command. Note that the function immediately ends as soon as it hits a return() command. (This exercise is to practice creating vectors, storing values in them, and returning the vector.)
+
+
+```{r}
+AgeLengthVec <- function(age, k = 0.2, Linfinity = 80, t0 = -0.2) {
+  nage <- length(age)
+  lengths <- numeric(length = nage) #use numeric () function to create a numeric vector instead of vector
+  for(i in 1:nage){
+    lenghts[i] <- VonBert(age=age[i], k=k, Linfinity = Linfinity, t0= t0) 
+    print(lengths)
+  }
+  return(lengths)
+}
+   
+
+AgeLengthVec(age =1:10)
+```
+
+Juan Carlos
+
+```{r}
+AgeLengthsVec <- function(ages, k = 0.2, Linfinity = 80, t0 = -0.2){
+  nages <- length(ages)
+  lengths <- numeric(length = nages)
+  for (i in 1:nages){
+    lengths[i] <- VonBert(ages[i], k = k, Linfinity = Linfinity, t0 = t0)
+    print(lengths)
+  }
+  return(lengths)
+}
+
+AgeLengthsVec(ages = 1:10)
+```
+
+
+Avoid for loops as much as you can because they take time and memory.
+So if you do not need to use the preveios parameter you basically do not need a for loop.
+As it is in this cases. 
+
+
+##Exercise 6: looping over age, length and weight
+
+Having built functions that convert age to length, and length to weight, now we can loop through vectors of age and predict the length and weight for fish at that age. Create a function `AgeValues()` that takes as input a vector of ages age.vec, and the parameters in the above functions, and uses the functions you created in exercises 1 and 2 to return length at each age, and weight at each age.
+
+```{r}
+
+```
+
+
+
+##Exercise 7
+
+R0 - recruitment with no fishing
+S0 - Spawning biomass
+
+
+
+
+
+
+
+
+
+
+

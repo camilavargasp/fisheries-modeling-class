@@ -1,0 +1,16 @@
+---
+title: "Fisheries Modeling Class Notes"
+author: "Camila Vargas"
+date: "2/6/2018"
+output: html_document
+---
+
+#Spatial Modeling
+
+Why space matter? 
+Population are not uniform, explotation is not uniforms..
+
+Ideal free distribution:
+Assumes - Perfect knowledge  of the resources and no cost of to choose an are over the other.
+Therefore, predators distribute evenly. 
+
