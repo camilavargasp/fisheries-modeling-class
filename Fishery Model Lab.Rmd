@@ -5,12 +5,425 @@ date: "2/6/2018"
 output: html_document
 ---
 
-#Spatial Modeling
+#Lab 5: Using optim in R
 
-Why space matter? 
-Population are not uniform, explotation is not uniforms..
+Optimization in R is not as good as in Excel but if you have to do the same thing 1000 time, R has more power.
 
-Ideal free distribution:
-Assumes - Perfect knowledge  of the resources and no cost of to choose an are over the other.
-Therefore, predators distribute evenly. 
+##Function
+You assing a name to a certain function. Everything in the function should depend on the parametes you define in your function. 
+
+Key parts: Name,parameters and the return (what your function retuns)
+
+Example on how to get optimum to run
+
+```{r}
+#This is how you would NORMALLY write the function
+random.func <- function(x, y, arbitrary) {
+   answer <- (x-3.9)^2 + (y-9.65)^2 + 3.6
+   
+   #code using parameters not being minimized
+   print(arbitrary)
+   return(answer)
+}
+random.func(x=3, y=2, arbitrary="Hello world")
+#this is the smallest possible value of the objective function
+random.func(x=3.9, y=9.65, arbitrary="Hello world")
+
+#all you are doing with arbitrary is to print it out.
+
+```
+
+
+In order to minimize, you have to indicate what you want to minimize.
+Eg: change the value of x and y to minimie the values of random.func
+You have to set your function in the right way to be able to use `optim()`
+
+```{r}
+#For optim() you need all parameters that will be 
+#minimized to be in a single vector
+#this returns the objective function
+random.func2 <- function(xvec, arbitrary) { #avector as a parameter
+   x <- xvec[1] #assing 1 for the first part of the vector and y to the second
+   y <- xvec[2]
+   answer <- (x-3.9)^2 + (y-9.65)^2 + 3.6
+   #code using parameters not being minimized
+   print(arbitrary)
+   return(answer)
+}
+x <- random.func2(xvec=c(3,2), arbitrary="Hello world") #x =  62.9325
+random.func2(xvec=c(3.9,9.65), arbitrary="Hello world") #when x is 3.9 and y is 9.65 then the answer of my function is 3.6.
+```
+
+
+Using `optim()`
+
+```{r}
+optim(par=c(1,1),                   #vector of starting values
+      fn=random.func2,              #function to minimize
+      method="Nelder-Mead",         #method to use
+      arbitrary="Hello, I am HAL.")  #other parameters of fn
+
+
+#Everytime the function optim() calls the function in order to find the minum it prints Hello, I am HAL (in this case it was 69). Convergence =0 means it got to the right answer.
+
+```
+
+##Lab Exercise 
+
+###Part 1
+
+```{r}
+#growth function
+
+
+
+exp.growth <- function(N0, r, t0=1975, tn=2010){
+  nyears <- tn-t0
+  n.vec <- numeric(length = nyears)
+  n.vec[1] <- N0
+  for(i in 1:(nyears)){
+    n.vec[i+1] <-(1+r)*n.vec[i]
+  }
+  return(n.vec)
+}
+
+x <- exp.growth(N0=300, r=0.05)
+```
+
+
+###Part 2: Calculationg NNL
+
+```{r}
+
+get.NLL <- function(N0, r, t0=1975, tn=2010){
+  nyears <- tn-t0
+  n.vec <-exp.growth(N0=N0, r=r)
+  N1981 <- n.vec[7]
+  N1988 <- n.vec[17]
+  N1998 <- n.vec[24]
+  NLL <- (log(435)-log(N1981))^2/(2*0.40^2) + (log(559)-log(N1988))^2/(2*0.47^2)+ (log(2280)-log(N1998))^2/(2*0.36^2)
+  
+  print(c(N1981, N1988, N1998))
+  #print(N1988)
+  #print(N1998)
+  return(NLL)
+}
+
+get.NLL(N0=300, r=0.05)
+
+```
+
+###Part 3: Creating a function for optim
+
+```{r}
+minimize.NLL <- function(param.vector, startyear=1975, endyear=2010){
+  N0 <- param.vector[1]
+  r <- param.vector[2]
+  n.vec <-exp.growth(N0=N0, r=r)
+  N1981 <- n.vec[7]
+  N1988 <- n.vec[17]
+  N1998 <- n.vec[24]
+  NLL <- (log(435)-log(N1981))^2/(2*0.40^2) + (log(559)-log(N1988))^2/(2*0.47^2)+ (log(2280)-log(N1998))^2/(2*0.36^2)
+  
+  print(c(N1981, N1988, N1998))
+  #print(N1988)
+  #print(N1998)
+  return(NLL)
+}
+
+minimize.NLL(param.vector = c(300, 0.05))
+
+optim(par=c(300, 0.05),                   #vector of starting values
+      fn=minimize.NLL,              #function to minimize
+      method="Nelder-Mead",          #method to use
+      startyear=1975, endyear=2010)       
+     
+
+
+```
+
+
+#Lab 6: Simulation-estimation method
+Simulate using a logistic method and a fleet effort going up and down.
+
+##Part 1: Methods for simulating catches, biomass and effort dynamics
+
+```{r}
+logistic.effort <- function(r, K, Bstart, Fstart, nyears, 
+                            x, a, sigma, nruns,
+                            minF=0, maxF=100, plot=T) {
+   Bmat <- matrix(nrow=nruns, ncol=nyears, 
+                  dimnames=list(paste("Run",1:nruns), paste("Year",1:nyears)))
+   Fmat <- matrix(nrow=nruns, ncol=nyears, 
+                  dimnames=list(paste("Run",1:nruns), paste("Year",1:nyears)))
+   Cmat <- matrix(nrow=nruns, ncol=nyears, 
+                  dimnames=list(paste("Run",1:nruns), paste("Year",1:nyears)))
+   Bmat[,1] <- Bstart   
+   Fmat[,1] <- Fstart
+   umsy <- r/2    #umsy = 1-exp(-Fmsy)
+   Bmsy <- K/2    #the Bmsy in a logistic equation
+   MSY <- r*K/4
+   Bmey <- a*Bmsy   #biomass at maximum economic yield
+   for (i in 1:nruns) {
+      for (yr in 1:(nyears-1)) {
+         Cmat[i,yr] <- Bmat[i,yr]*(1-exp(-Fmat[i,yr]))
+         Bmat[i,yr+1] <- Bmat[i,yr] + r*Bmat[i,yr]*(1-Bmat[i,yr]/K) - Cmat[i,yr]
+         wt <- rnorm(n=1,mean=0,sd=sigma)     #add some uncertainty
+         Fmat[i,yr+1] <- Fmat[i,yr]*((Bmat[i,yr]/(a*Bmsy))^x) * exp(wt)    #new fishing mortality
+         Fmat[i,yr+1] <- min(Fmat[i,yr+1],maxF)  #limit fishing mortality
+         Fmat[i,yr+1] <- max(Fmat[i,yr+1],minF)  #limit fishing mortality
+      } #end of loop over years
+      Cmat[i,nyears] <- Bmat[i,nyears]*(1-exp(-Fmat[i,nyears]))
+   } #end of loop for nruns
+   
+   #PLOTTING PART
+   if (plot==T) {  #only plot if you need to see the plots, otherwise skip plotting
+      par(mfrow=c(3,1), mar=c(0,0,0,0), oma=c(5,5,1,1))
+      plot(x=1:nyears,y=Fmat[1,], lwd=2,col="black",type="l",yaxs="i", 
+           ylim=c(0,1.05*max(Fmat)), las=1, xaxt="n")
+      for (i in 2:nruns) {
+         lines(x=1:nyears,y=Fmat[i,], col="black", type="l")
+      }
+      mtext(side=3,"Fishing mortality", line=-2)
+      plot(x=1:nyears,y=Bmat[1,], lwd=2,col="blue",type="l",yaxs="i", 
+           ylim=c(0,1.1*K), las=1, xaxt="n")
+      for (i in 2:nruns) {
+         lines(x=1:nyears,y=Bmat[i,], col="blue", type="l")
+      }
+      mtext(side=3,"Biomass", line=-2)
+      plot(x=1:nyears,y=Cmat[1,], lwd=2,col="red",type="l",yaxs="i", 
+           ylim=c(0,1.05*max(Cmat)), las=1)
+      for (i in 2:nruns) {
+         lines(x=1:nyears,y=Cmat[i,], col="red", type="l")
+      }
+      mtext(side=3,"Catches", line=-2)
+   }
+   invisible(list(Bmat=Bmat, Fmat=Fmat, Cmat=Cmat, BdivBmsy=Bmat/Bmsy))
+}
+#short 5-yr run
+temp <- logistic.effort(r=0.2, K=1000, Bstart=1000, Fstart=0.01, 
+                        nyears=5, x=1, a=1.8, sigma=0.15, nruns=10,
+                        minF=0, maxF=100, plot=T)
+temp  #look at what is in there from 5 years of simulation
+
+#examine 100 year runs, these are the low and high fishing scenarios
+#scenario 1: a=1.8, x=1, sigma=0.15 (very lightly depleted)
+require(manipulate)  #needs manipulate function which only works in Rstudio
+manipulate(logistic.effort(r=0.2,K=1000,Bstart,Fstart,nyears,x,a,sigma,nruns),
+           Bstart=slider(10,1000, initial=1000),
+           Fstart=slider(0.01,0.3, initial=0.01),
+           nyears=slider(10,5000, initial=100),
+           x=slider(0.01, 5, initial=1),
+           a=slider(0.2,1.8, initial=1.8),
+           sigma=slider(0,0.5, initial=0.15),
+           nruns=slider(1,20,initial=4)   )
+
+#scenario 2: a=0.2, x=0.03, sigma=0.15 (serious depletion)
+require(manipulate)  #needs manipulate function which only works in Rstudio
+manipulate(logistic.effort(r=0.2,K=1000,Bstart,Fstart,nyears,x,a,sigma,nruns),
+           Bstart=slider(10,1000, initial=1000),
+           Fstart=slider(0.01,0.3, initial=0.01),
+           nyears=slider(10,5000, initial=100),
+           x=slider(0.01, 5, initial=0.03),
+           a=slider(0.2,1.8, initial=0.2),
+           sigma=slider(0,0.5, initial=0.15),
+           nruns=slider(1,20,initial=4)   )
+
+
+```
+
+
+##Part 2: Kleinsner et al. (2013) method
+
+```{r}
+Kleisner.method.final.yr <- function(catches) {
+   nyear <- length(catches)
+   maxC <- -1  #running variable recording the maximum catch
+   maxYr <- -1 #records the year of the maximum catch
+   
+   #find the year of the highest catch & the highest catch itself
+   #If there are two years of equal max, the last
+   #  is assumed to be the year of maximum catch
+   for (i in 1:nyear) {
+      if (catches[i] >= maxC) {  #current year catch is the highest so far
+         maxC <- catches[i]      
+         maxYr <- i
+      }
+   }
+   
+   scenario <- -1  #test to make sure that this works   
+   #developing scenario
+   if (nyear==maxYr) {
+      scenario <- 1
+   }
+   #fully exploited: make sure it is not scenario 1! 
+   if (catches[nyear] > 0.5*maxC & scenario < 0) {      
+      scenario <- 2
+   }
+   #overexploited
+   if (catches[nyear] >= 0.1*maxC & catches[nyear] <= 0.5*maxC & 
+          nyear > maxYr & scenario < 0) {      
+      scenario <- 3
+   }
+   #collapsed
+   if (catches[nyear] < 0.1*maxC & nyear > maxYr & 
+          scenario < 0) {      
+      scenario <- 4
+   }
+   
+   return(scenario)
+}
+
+#TO DO: create test cases that will return 1, 2, 3, 4 by changing
+#the catch in the last year
+Kleisner.method.final.yr(catches = c(5, 20, 100, 500)) #1
+
+Kleisner.method.final.yr(catches = c(50, 200, 300, 160)) #2
+
+Kleisner.method.final.yr(catches = c(20,500, 300, 70)) #3
+
+Kleisner.method.final.yr(catches = c(200, 400, 30)) #4
+
+
+```
+
+
+##Part 3: Applying the Kleisner method to the simulated data
+
+```{r}
+apply.Kleisner <- function(a=1.8, x=1, nruns=100) {
+  
+  temp <- logistic.effort(r=0.2, K=1000, Bstart=1000, Fstart=0.01, 
+                        nyears=5, x=x, a=a, sigma=0.15, nruns=nruns,
+                        minF=0, maxF=100, plot=F)
+    #effort <-  logistic.effort(r=0.2, K=1000, Bstart=1000, Fstart=0.01, nyears=100, x=x, a=a, sigma=0.15, nruns=nruns,minF=0, maxF=100, plot=F)
+   
+    results <- numeric(length=nruns)
+    
+    for(i in 1:nruns){
+      results[i] <- Kleisner.method.final.yr(catches= temp$Cmat[i,]) #calls the Catch matrix from the logistic.effort equation
+    }
+   
+   return(table(results)) #table function allows me to know how many results I have in each scenario
+}
+
+apply.Kleisner()
+
+
+#x=1, a=1.8
+
+#x=0.03, a=0.2
+```
+
+##Part 4: Biomass comparison
+
+```{r}
+biomass.method.final.yr <- function(BdivBmsy){
+ category <- -1  #test to make sure that this works   
+   #developing scenario
+   if (BdivBmsy>1.5) {
+      category <- 1
+   }
+   #fully exploited: make sure it is not scenario 1! 
+   if ( BdivBmsy >0.5 & BdivBmsy <= 1.5) {   
+      category <- 2
+   }
+   #overexploited
+   if (BdivBmsy > 0.2 & BdivBmsy <= 0.5) {      
+      category <- 3
+   }
+   #collapsed
+   if (BdivBmsy <= 0.2) {      
+      category <- 4
+   }
+   return(category) 
+}
+  
+   
+biomass.method.final.yr(BdivBmsy=c(1,2,1,1.6))  #should be 1
+biomass.method.final.yr(BdivBmsy=c(1,2,5,1))  #should be 2
+biomass.method.final.yr(BdivBmsy=c(1,2,5,0.4))  #should be 3
+biomass.method.final.yr(BdivBmsy=c(1,2,5,0.1)) #should be 4
+
+```
+
+
+#Lab 7: Marine protected area model in R
+
+###Part 1: Check code for harvesr rate
+
+```{r}
+calc.harvest.vec <- function(u.out, ncells, MPA.width)  {
+   u.vec <- vector(length=ncells)
+   u.vec[] <- u.out       #set every cell to u.out, equivalent to u.vec[1:ncells] <- u.out   
+   if (MPA.width > 0) {   #no need to do this if there is no MPA! 
+      MPA.begin <- round((ncells-MPA.width)/2)+1  #start cell of MPA
+      MPA.end <- MPA.begin + MPA.width -1         #end cell of MPA
+      u.vec[MPA.begin:MPA.end] <- 0        
+   }
+   return(u.vec)
+}
+
+calc.harvest.vec(u.out=0.2, ncells = 10, MPA.width = 5)
+
+```
+
+###Part 2: MPA Model
+
+```{r}
+MPA.model <- function(r, K, u.out, ncells, nsteps, MPA.width, mrate){
+  
+  u.vec <- calc.harvest.vec(u.out=u.out, ncells=ncells, MPA.width=MPA.width) #calls the function that defines the harvest in each cell
+
+  pop <- numeric(length = ncells) ##creates a vector for the population
+  pop[] <- K #fills in the pop vector with K calues
+  
+  left.cells <- vector(length = ncells)
+  right.cells <- vector(length = ncells)
+  
+  left.cells[] <- c(ncells, 1:(ncells-1))
+  right.cells[] <- c(2:ncells,1)
+  
+  plot(x=1:ncells, y=pop, xlab="Cell number", lwd=3, ylab="Population size", ylim=c(0, 1.05*max(pop)), type="l", yaxs="i", xaxs="i")
+  
+  for(i in 1:nsteps){
+    leaving <- pop[1:ncells]*2*mrate 
+    arriving <- 0.5*leaving[left.cells]+0.5*leaving[right.cells]
+    
+    surplus= r*pop*(1-pop/K)
+    catch = u.vec*pop
+    
+    #update the population numbers
+    pop <- pop + surplus - catch - leaving + arriving    
+    
+    #plot the population in each cell (uncomment when ready)
+    
+    lines(x=1:ncells, y=pop, lwd=(nsteps-i+1)/nsteps*3)
+  }
+  
+}
+
+MPA.model(r=0.2, K=1000, u.out=0.4, ncells=21,MPA.width=5, nsteps=10, mrate=0.2)
+
+```
+
+#Lab 8: Bayesian assessment of yelloweye rockfish
+
+```{r}
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
